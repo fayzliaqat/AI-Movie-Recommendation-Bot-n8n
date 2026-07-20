@@ -1,0 +1,512 @@
+{
+  "name": "Movie Night Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 📥 User Input & Validation Nodes",
+        "height": 80,
+        "width": 422,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -48,
+        -240
+      ],
+      "typeVersion": 1,
+      "id": "b4ae1d23-7c80-4b84-9afb-cbef691ce652",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## 🤖 AI/Processing Nodes",
+        "height": 80,
+        "width": 310,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        752,
+        -336
+      ],
+      "typeVersion": 1,
+      "id": "7478ed5c-b05f-416d-a76b-ddbecc24817a",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/movie-night",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -128,
+        -128
+      ],
+      "id": "a447ffbf-e08e-478e-a044-25b4ef40759e",
+      "name": "🎬 User Input (Webhook)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "778c385e-ad76-4c0b-aba5-ba992fb3ab48",
+              "name": "=cleanMood",
+              "value": "={{ $json.body.mood.toLowerCase().trim() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        96,
+        -128
+      ],
+      "id": "282201f9-d3d2-44ce-ad38-cb5b562cdc46",
+      "name": "🧹 Clean & Normalize Mood",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "42b8671b-2edd-43d2-b2d8-714b1ef9ba37",
+              "leftValue": "={{ $json.cleanMood }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        -128
+      ],
+      "id": "d122fb08-d378-4098-baeb-6e56444b50e9",
+      "name": "✅ Validate User Input"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e4818050-7b06-4c9a-afe2-3d5ce27268fc",
+              "name": "=geminiPrompt",
+              "value": "={{ \"You are an expert movie recommendation assistant. The user's mood is: '\" + $json.cleanMood + \"'. Recommend exactly 3 movies that perfectly match this mood. Format your response as clean, plain text without any special characters like asterisks, hashtags, or markdown symbols. Structure it like this:\\n\\nMovie 1:\\nTitle: [Movie Name] (Year)\\nWhy watch: [2-3 engaging sentences explaining why this movie fits the mood]\\n\\nMovie 2:\\nTitle: [Movie Name] (Year)\\nWhy watch: [2-3 engaging sentences]\\n\\nMovie 3:\\nTitle: [Movie Name] (Year)\\nWhy watch: [2-3 engaging sentences]\\n\\nMake your descriptions warm, engaging, and easy to read. Use simple line breaks for structure.\" }}\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        544,
+        -224
+      ],
+      "id": "4304704f-5e01-4d26-af2c-d8f1af288534",
+      "name": "📝 Build Gemini Prompt"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the prompt from previous node\nconst prompt = $input.item.json.geminiPrompt;\n\n// Build the request body\nconst requestBody = {\n  contents: [{\n    parts: [{\n      text: prompt\n    }]\n  }]\n};\n\n// Return it\nreturn { json: { requestBody: requestBody, geminiPrompt: prompt } };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        -224
+      ],
+      "id": "3932c6e5-cf30-436c-baa1-ff6ed565dad2",
+      "name": "🔧 Prepare API Request Body"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-goog-api-key",
+              "value": "={{ $env.GEMINI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        992,
+        -224
+      ],
+      "id": "7e2ea2e0-8ae2-4321-8f3a-7adc0c3a47ec",
+      "name": "🤖 Call Gemini AI",
+      "notes": "Uses gemini-2.0-flash model with custom prompt engineering"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ac1264a6-1d16-4f8e-81bd-160a59c540c0",
+              "name": "movieSuggestions",
+              "value": "={{ $json.candidates[0].content.parts[0].text }}\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1216,
+        -224
+      ],
+      "id": "68a82ca3-3bdf-4f46-a9f0-004d42141834",
+      "name": "📄 Extract Movie Suggestions"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6310b6e0-e399-4c9e-8542-916007d8a409",
+              "name": "status",
+              "value": "success",
+              "type": "string"
+            },
+            {
+              "id": "b26abb35-49b4-417a-b257-8bc9d72ced38",
+              "name": "=mood",
+              "value": "={{ $('🧹 Clean & Normalize Mood').item.json.cleanMood }}",
+              "type": "string"
+            },
+            {
+              "id": "1c774012-c909-4712-b807-ac6d5ad1f050",
+              "name": "=suggestions",
+              "value": "={{ $json.movieSuggestions }}",
+              "type": "string"
+            },
+            {
+              "id": "2e1ad5fd-6613-4731-a46c-d36e280055f8",
+              "name": "emailSent",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1440,
+        -224
+      ],
+      "id": "1fd34c25-712b-45c4-9dd7-7bac6209c772",
+      "name": "📦 Format JSON Response"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.SMTP_USER }}",
+        "toEmail": "recipient@example.com",
+        "subject": "=🎬 Your Movie Recommendations for {{ $json.mood }} Mood",
+        "emailFormat": "text",
+        "text": "={{ \"Hi there!\\n\\nYou asked for movie recommendations for a \" + $json.mood + \" mood. Here are your personalized suggestions:\\n\\n\" + $json.suggestions + \"\\n\\nEnjoy your movie night!\\n\\nBest regards,\\nMovie Night Bot 🎬\" }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1664,
+        -224
+      ],
+      "id": "65c8ec5f-146d-4667-8bb3-4811b9f0a18c",
+      "name": "📧 Send Email Notification"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bf863f53-05ec-4396-8f5d-e8ee526c17bc",
+              "name": "status",
+              "value": "error!",
+              "type": "string"
+            },
+            {
+              "id": "15ca80a1-c6c4-481b-9a4f-4c39f215fd84",
+              "name": "message",
+              "value": "Please provide a valid mood or genre.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "f4f56059-78de-4e89-bea8-d6a35f36a035",
+      "name": "❌ Error: Invalid Input"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1872,
+        -112
+      ],
+      "id": "cada90d7-277c-43c5-b86e-c0d339bfb8df",
+      "name": "✅ Send Response to User"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "width": 192,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        992,
+        -16
+      ],
+      "typeVersion": 1,
+      "id": "d52150eb-d1af-4cc3-b1bc-e5340d0edff9",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 176,
+        "width": 624,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -160,
+        -144
+      ],
+      "typeVersion": 1,
+      "id": "d60d9a1c-e01e-4c2d-8490-036e0ebc7d05",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "width": 864,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        496,
+        -240
+      ],
+      "typeVersion": 1,
+      "id": "4321ee85-a367-4c4a-85ab-a6484c56e43b",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 288,
+        "width": 640,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1424,
+        -240
+      ],
+      "typeVersion": 1,
+      "id": "e36af6a4-9586-4847-abdd-85bcdaa34965",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## 📤 Output Nodes",
+        "height": 80,
+        "width": 230,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1648,
+        -336
+      ],
+      "typeVersion": 1,
+      "id": "6b941bb4-f4c1-4a0d-b97c-c959b448dacd",
+      "name": "Sticky Note6"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "🎬 User Input (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "🧹 Clean & Normalize Mood",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧹 Clean & Normalize Mood": {
+      "main": [
+        [
+          {
+            "node": "✅ Validate User Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "✅ Validate User Input": {
+      "main": [
+        [
+          {
+            "node": "📝 Build Gemini Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "❌ Error: Invalid Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Build Gemini Prompt": {
+      "main": [
+        [
+          {
+            "node": "🔧 Prepare API Request Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔧 Prepare API Request Body": {
+      "main": [
+        [
+          {
+            "node": "🤖 Call Gemini AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🤖 Call Gemini AI": {
+      "main": [
+        [
+          {
+            "node": "📄 Extract Movie Suggestions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📄 Extract Movie Suggestions": {
+      "main": [
+        [
+          {
+            "node": "📦 Format JSON Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📦 Format JSON Response": {
+      "main": [
+        [
+          {
+            "node": "📧 Send Email Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📧 Send Email Notification": {
+      "main": [
+        [
+          {
+            "node": "✅ Send Response to User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❌ Error: Invalid Input": {
+      "main": [
+        [
+          {
+            "node": "✅ Send Response to User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "nAQZL1HsYzs3A0LW",
+  "tags": []
+}
